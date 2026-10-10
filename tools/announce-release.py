@@ -62,18 +62,25 @@ def announce(webhook, expected_channel, payload, send, record):
     return record
 
 def run():
-    tag = os.environ["RELEASE_TAG"]
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,99}", tag):
-        raise ValueError(f"invalid release tag: {tag!r}")
+    tag = os.environ.get("RELEASE_TAG", "")
+    send = os.environ.get("SEND_ANNOUNCEMENT") == "true"
+    if send and not tag:
+        raise ValueError("sending requires a published release tag")
     repo = os.environ["GITHUB_REPOSITORY"]
-    release = request_json(f"https://api.github.com/repos/{repo}/releases/tags/{tag}", "read published GitHub release", {"Authorization": "Bearer " + os.environ["GH_TOKEN"], "Accept": "application/vnd.github+json"})
-    if release["tag_name"] != tag:
-        raise ValueError("GitHub release tag differs from requested tag")
-    payload = build_payload(release, os.environ["PRODUCT_NAME"], os.environ["PRODUCT_SUMMARY"], os.environ["PRODUCT_SUPPORT"])
+    record = {"release_tag": tag or None, "repository": repo}
+    payload = {}
+    if tag:
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,99}", tag):
+            raise ValueError(f"invalid release tag: {tag!r}")
+        release = request_json(f"https://api.github.com/repos/{repo}/releases/tags/{tag}", "read published GitHub release", {"Authorization": "Bearer " + os.environ["GH_TOKEN"], "Accept": "application/vnd.github+json"})
+        if release["tag_name"] != tag:
+            raise ValueError("GitHub release tag differs from requested tag")
+        record["release_id"] = release["id"]
+        payload = build_payload(release, os.environ["PRODUCT_NAME"], os.environ["PRODUCT_SUMMARY"], os.environ["PRODUCT_SUPPORT"])
     webhook = os.environ.get("DISCORD_RELEASE_WEBHOOK", "")
     if not webhook:
         raise ValueError("DISCORD_RELEASE_WEBHOOK is missing; release announcement cannot run")
-    result = announce(webhook, os.environ["DISCORD_CHANNEL_ID"], payload, os.environ.get("SEND_ANNOUNCEMENT") == "true", {"release_id": release["id"], "release_tag": tag, "repository": repo})
+    result = announce(webhook, os.environ["DISCORD_CHANNEL_ID"], payload, send, record)
     with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
         summary.write(f"Discord: {result['status']}. Channel: {result['channel_id']}.\n\n" + result.get("message_url", "No message sent.") + "\n")
 

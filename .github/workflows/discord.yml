@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing published release tag
+        description: Existing published release tag (optional for a channel-only check)
         type: string
-        required: true
+        required: false
       announce:
         description: Send the release announcement (check Discord before retry)
         type: boolean

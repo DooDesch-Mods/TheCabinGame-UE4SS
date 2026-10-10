@@ -11,6 +11,12 @@ discord = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(discord)
 
 class Announcement(unittest.TestCase):
+    def test_send_without_release_tag_stops_before_network(self):
+        with patch.dict(os.environ, {"RELEASE_TAG": "", "SEND_ANNOUNCEMENT": "true"}), patch.object(discord, "request_json") as request:
+            with self.assertRaisesRegex(ValueError, "published release tag"):
+                discord.run()
+            request.assert_not_called()
+
     def test_draft_cannot_be_announced(self):
         with self.assertRaisesRegex(ValueError, "not published"):
             discord.build_payload({"draft": True}, "Test", "Summary", "https://example.test")
