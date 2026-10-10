@@ -20,14 +20,16 @@ def request_json(url, label, headers=None, payload=None):
         reason = re.sub(r"https://[^\s'\"]+", "[URL redacted]", reason)
         raise RuntimeError(f"{label}: {reason}; delivery is unconfirmed") from error
 
-def build_payload(release, name, description, support):
+def build_payload(release, name, description, support, thumbnail):
     if release["draft"] or not release.get("published_at"):
         raise ValueError("release is not published")
+    if urllib.parse.urlparse(thumbnail).scheme != "https":
+        raise ValueError("product thumbnail requires an HTTPS image URL")
     title = name + " " + release["tag_name"].removeprefix("v")
     if release["prerelease"]:
         title += " (pre-release)"
     description += f"\n\n[Download]({release['html_url']}) · [Support]({support})"
-    return {"allowed_mentions": {"parse": []}, "embeds": [{"title": title, "url": release["html_url"], "description": description, "color": 0x7DFAAB}]}
+    return {"allowed_mentions": {"parse": []}, "embeds": [{"title": title, "url": release["html_url"], "description": description, "color": 0x7DFAAB, "thumbnail": {"url": thumbnail}}]}
 
 def announce(webhook, expected_channel, payload, send, record):
     parsed = urllib.parse.urlparse(webhook)
@@ -76,7 +78,7 @@ def run():
         if release["tag_name"] != tag:
             raise ValueError("GitHub release tag differs from requested tag")
         record["release_id"] = release["id"]
-        payload = build_payload(release, os.environ["PRODUCT_NAME"], os.environ["PRODUCT_SUMMARY"], os.environ["PRODUCT_SUPPORT"])
+        payload = build_payload(release, os.environ["PRODUCT_NAME"], os.environ["PRODUCT_SUMMARY"], os.environ["PRODUCT_SUPPORT"], os.environ["PRODUCT_THUMBNAIL"])
     webhook = os.environ.get("DISCORD_RELEASE_WEBHOOK", "")
     if not webhook:
         raise ValueError("DISCORD_RELEASE_WEBHOOK is missing; release announcement cannot run")

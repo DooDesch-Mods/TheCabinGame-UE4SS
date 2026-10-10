@@ -37,6 +37,7 @@ jobs:
           PRODUCT_NAME: UE4SS for the cabin game
           PRODUCT_SUMMARY: The UE4SS loader for the cabin game. Original upstream package with installation instructions.
           PRODUCT_SUPPORT: https://support.doodesch.de/ue4ss
+          PRODUCT_THUMBNAIL: https://raw.githubusercontent.com/DooDesch-Mods/TheCabinGame-Vortex/main/extension/gameart.png
         run: python tools/announce-release.py
       - name: Keep Discord acknowledgement
         if: always()
