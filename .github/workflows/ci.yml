@@ -1,0 +1,28 @@
+name: Check distribution
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: '3.13'
+      - name: Check distribution and publication guards
+        run: python -m unittest discover -s tests -v
+      - name: Check and prepare original upstream ZIP
+        run: python tools/distribution.py prepare
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: ue4ss-package
+          path: dist/*
+          if-no-files-found: error

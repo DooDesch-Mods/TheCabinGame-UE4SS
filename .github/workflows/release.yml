@@ -1,0 +1,89 @@
+name: Release and update Nexus
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag (check Nexus versions before retry)
+        type: string
+        required: true
+      publish_nexus:
+        description: Upload a new version to Nexus Mods
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: nexus-release-${{ github.repository }}
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' || github.event.release.prerelease == false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.event.release.tag_name }}
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: '3.13'
+      - name: Verify distribution guards
+        run: python -m unittest discover -s tests -v
+      - name: Check release approval and Nexus target
+        id: gate
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.event.release.tag_name }}
+          NEXUS_APPROVED_SHA256: ${{ vars.NEXUS_APPROVED_SHA256 }}
+          NEXUS_FILE_GROUP_ID: ${{ vars.NEXUS_FILE_GROUP_ID }}
+          NEXUS_MOD_ID: ${{ vars.NEXUS_MOD_ID }}
+          NEXUS_API_KEY: ${{ secrets.NEXUSMODS_API_KEY }}
+          PUBLISH_NEXUS: ${{ github.event_name == 'release' || inputs.publish_nexus }}
+        run: python tools/distribution.py preflight
+      - name: Check and prepare original upstream ZIP
+        id: package
+        run: python tools/distribution.py prepare
+      - name: Attach checked archive and receipt to GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag || github.event.release.tag_name }}
+          ASSET: ${{ steps.package.outputs.asset }}
+          RECEIPT: ${{ steps.package.outputs.receipt }}
+        run: gh release upload "$RELEASE_TAG" "$ASSET" "$RECEIPT" --repo "$GITHUB_REPOSITORY" --clobber
+      - name: Upload new file version to Nexus
+        if: steps.gate.outputs.nexus_ready == 'true'
+        # Nexus-Mods/upload-action v1.0.0-beta.10, pinned to a commit.
+        uses: Nexus-Mods/upload-action@c96019556046053aa26044b44396cd38929daf23
+        id: nexus
+        with:
+          api_key: ${{ secrets.NEXUSMODS_API_KEY }}
+          file_id: ${{ vars.NEXUS_FILE_GROUP_ID }}
+          filename: ${{ steps.package.outputs.asset }}
+          version: ${{ steps.package.outputs.version }}
+          display_name: UE4SS ${{ steps.package.outputs.version }} for the cabin game
+          description: ${{ steps.package.outputs.notes }}
+          mod_id: ${{ steps.gate.outputs.mod_id }}
+          changelog: ${{ steps.gate.outputs.mod_id && steps.package.outputs.notes || '' }}
+          category: main
+          primary_mod_manager_download: false
+          allow_mod_manager_download: false
+          archive_existing_version: true
+          update_mod_version: true
+      - name: Record Nexus acknowledgement or deliberate skip
+        env:
+          READY: ${{ steps.gate.outputs.nexus_ready }}
+          STATUS: ${{ steps.gate.outputs.nexus_status }}
+          VERSION_ID: ${{ steps.nexus.outputs.version_id }}
+        run: |
+          if [ "$READY" = true ] && [ -z "$VERSION_ID" ]; then
+            echo 'error: Nexus action returned no uploaded version ID' >&2
+            exit 1
+          fi
+          printf 'Nexus status: %s. Version ID: %s\n' "$STATUS" "${VERSION_ID:-not attempted}" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: release-package
+          path: dist/*
+          if-no-files-found: error

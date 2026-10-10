@@ -1,0 +1,13 @@
+{
+  "version": "v3.0.1-1164-g5e627997",
+  "assetId": 624373295,
+  "asset": "UE4SS_v3.0.1-1164-g5e627997.zip",
+  "url": "https://github.com/UE4SS-RE/RE-UE4SS/releases/download/experimental-latest/UE4SS_v3.0.1-1164-g5e627997.zip",
+  "sha256": "3c72142a383e25e9f9553ac9e4d5677aa572e98cb369cac57200efb2e381e603",
+  "bytes": 8733058,
+  "sourceCommit": "5e627997bf265ae6fc89d23357543d8c8ac05a6f",
+  "licenseSha256": "ddc030e25d0ea87aca4ae84c0ed3f868d69273c00c0c12ea1e26f1c6130f5d2e",
+  "gameBuild": "25553694",
+  "unrealVersion": "5.5",
+  "releaseNotes": "Unmodified UE4SS basic build v3.0.1-1164-g5e627997 for the cabin game. See the release page for the tested game and mod versions. Upstream copyright and MIT license are preserved."
+}
