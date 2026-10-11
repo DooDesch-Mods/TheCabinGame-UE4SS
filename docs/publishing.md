@@ -47,8 +47,9 @@ before any upload. The public repo uses the existing organization secret.
 | Secret `NEXUSMODS_API_KEY` | Existing organizational Nexus key |
 
 The loader has its own page and IDs. Do not reuse the Vortex extension or
-ChairMarker file-group ID. Its original basic ZIP is for manual installation;
-Mod Manager Download stays off until a supported loader installation is tested.
+ChairMarker file-group ID. Manual import of the original basic ZIP passed in
+Vortex 2.8.0 with extension 0.1.1, including gameplay and purge. Mod Manager
+Download stays off until the approved game mapping and download routing are checked.
 
 The official Nexus action is pinned to
 `c96019556046053aa26044b44396cd38929daf23`. Successful uploads must return a version
