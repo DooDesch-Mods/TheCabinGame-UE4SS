@@ -36,7 +36,7 @@ The original ZIP includes upstream example mods and settings. For Vortex, import
 the ZIP as a mod using the [game extension](https://github.com/DooDesch-Mods/TheCabinGame-Vortex).
 Extension 0.1.1 in Vortex 2.8.0 installed this loader and Chair Marker 0.1.2,
 which worked in game. Disable, re-enable and purge checks also passed.
-Nexus Mod Manager download routing still needs the approved game mapping.
+The Nexus Mod Manager download button uses the game's `thecabingame` mapping.
 
 To uninstall, close the game, preserve your mods/settings, then remove this
 loader's `dwmapi.dll` and `ue4ss` folder. Mods that require UE4SS will stop working.

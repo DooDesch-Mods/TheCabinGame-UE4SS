@@ -67,8 +67,8 @@ jobs:
           mod_id: ${{ steps.gate.outputs.mod_id }}
           changelog: ${{ steps.gate.outputs.mod_id && steps.package.outputs.notes || '' }}
           category: main
-          primary_mod_manager_download: false
-          allow_mod_manager_download: false
+          primary_mod_manager_download: ${{ vars.NEXUS_VORTEX_READY == 'true' }}
+          allow_mod_manager_download: ${{ vars.NEXUS_VORTEX_READY == 'true' }}
           archive_existing_version: true
           update_mod_version: true
       - name: Record Nexus acknowledgement or deliberate skip
