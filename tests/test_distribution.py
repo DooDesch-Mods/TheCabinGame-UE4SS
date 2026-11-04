@@ -184,21 +184,81 @@ class CandidateTests(unittest.TestCase):
     def test_new_candidate_keeps_selection_and_remains_unapproved(self):
         selected = copy.deepcopy(self.manifest)
         self.manifest['sha256'] = '0' * 64
-        with tempfile.TemporaryDirectory() as folder, patch.object(d, 'ROOT', Path(folder)), patch.dict(os.environ, {}, clear=True), patch.object(d, 'get', side_effect=[json.dumps({'assets': [self.asset]}).encode(), self.data]):
+        responses = [json.dumps({'assets': [self.asset]}).encode(), json.dumps({'assets': []}).encode(), self.data]
+        with tempfile.TemporaryDirectory() as folder, patch.object(d, 'ROOT', Path(folder)), patch.dict(os.environ, {}, clear=True), patch.object(d, 'get', side_effect=responses):
             report = d.candidate(self.manifest)
             self.assertFalse(report['approvedForNexus'])
+            self.assertEqual(report['url'], self.asset['browser_download_url'])
             self.assertEqual((Path(folder) / 'dist/candidate' / selected['asset']).read_bytes(), self.data)
             self.assertEqual(self.manifest['sha256'], '0' * 64)
             self.assertFalse((Path(folder) / 'distribution.json').exists())
 
+    def test_candidate_prefers_archive_url(self):
+        self.manifest['sha256'] = '0' * 64
+        archived = {**self.asset, 'id': 9, 'browser_download_url': 'https://example.invalid/experimental/asset.zip'}
+        other = {**archived, 'id': 8, 'digest': 'sha256:' + '1' * 64, 'browser_download_url': 'https://example.invalid/other.zip'}
+        responses = [json.dumps({'assets': [self.asset]}).encode(), json.dumps({'assets': [other, archived]}).encode(), self.data]
+        with tempfile.TemporaryDirectory() as folder, patch.object(d, 'ROOT', Path(folder)), patch.dict(os.environ, {}, clear=True), patch.object(d, 'get', side_effect=responses) as get:
+            report = d.candidate(self.manifest)
+            self.assertEqual((report['url'], report['assetId']), (archived['browser_download_url'], 9))
+            self.assertIn('/releases/tags/experimental', get.call_args_list[1].args[0])
+            self.assertEqual(get.call_args_list[2].args[0], archived['browser_download_url'])
+
     def test_modified_candidate_fails_before_artifact(self):
         self.manifest['sha256'] = '0' * 64
-        with tempfile.TemporaryDirectory() as folder, patch.object(d, 'ROOT', Path(folder)), patch.object(d, 'get', side_effect=[json.dumps({'assets': [self.asset]}).encode(), self.data + b'x']):
+        with tempfile.TemporaryDirectory() as folder, patch.object(d, 'ROOT', Path(folder)), patch.object(d, 'get', side_effect=[json.dumps({'assets': [self.asset]}).encode(), json.dumps({'assets': []}).encode(), self.data + b'x']):
             with self.assertRaisesRegex(ValueError, 'SHA-256 mismatch'):
                 d.candidate(self.manifest)
             self.assertFalse((Path(folder) / 'dist').exists())
 
+class PinnedDownloadTests(unittest.TestCase):
+    def setUp(self):
+        self.data = archive()
+        self.manifest = selection(self.data)
+        self.match = {'name': self.manifest['asset'], 'digest': 'sha256:' + self.manifest['sha256'],
+                      'browser_download_url': 'https://example.invalid/experimental/asset.zip'}
+
+    def fake_get(self, releases, status=404):
+        def get(url, api=False):
+            if url == self.manifest['url']:
+                raise d.urllib.error.HTTPError(url, status, 'error', {}, None)
+            if api:
+                return json.dumps({'assets': releases.get(url.rsplit('/', 1)[1], [])}).encode()
+            if url == self.match['browser_download_url']:
+                return self.data
+            raise AssertionError(f'unexpected download {url}')
+        return get
+
+    def test_pinned_url_is_used_directly(self):
+        with patch.object(d, 'get', return_value=self.data) as get:
+            self.assertEqual(d.fetch_pinned(self.manifest), self.data)
+            get.assert_called_once_with(self.manifest['url'])
+
+    def test_missing_url_falls_back_to_archive(self):
+        wrong = {**self.match, 'digest': 'sha256:' + '0' * 64, 'browser_download_url': 'https://example.invalid/wrong.zip'}
+        with patch.object(d, 'get', side_effect=self.fake_get({'experimental': [wrong, self.match]})):
+            self.assertEqual(d.fetch_pinned(self.manifest), self.data)
+
+    def test_missing_url_falls_back_to_rolling_release(self):
+        with patch.object(d, 'get', side_effect=self.fake_get({'experimental-latest': [self.match]})):
+            self.assertEqual(d.fetch_pinned(self.manifest), self.data)
+
+    def test_pruned_asset_fails(self):
+        with patch.object(d, 'get', side_effect=self.fake_get({})):
+            with self.assertRaisesRegex(ValueError, 'no longer published upstream'):
+                d.fetch_pinned(self.manifest)
+
+    def test_other_http_errors_are_not_masked(self):
+        with patch.object(d, 'get', side_effect=self.fake_get({'experimental': [self.match]}, status=500)):
+            with self.assertRaises(d.urllib.error.HTTPError):
+                d.fetch_pinned(self.manifest)
+
 class NoticeTests(unittest.TestCase):
+    def test_selected_url_is_not_on_the_rolling_release(self):
+        manifest = json.loads((ROOT / 'distribution.json').read_text())
+        self.assertNotIn('/download/experimental-latest/', manifest['url'])
+        self.assertNotIn('/download/experimental-latest/', (ROOT / 'README.md').read_text(encoding='utf-8'))
+
     def test_selected_license_hash_and_source(self):
         manifest = json.loads((ROOT / 'distribution.json').read_text())
         self.assertEqual(hashlib.sha256(LICENSE).hexdigest(), manifest['licenseSha256'])

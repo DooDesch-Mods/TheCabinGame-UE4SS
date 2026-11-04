@@ -17,7 +17,7 @@ Selected version: **v3.0.1-1164-g5e627997**. The loader was used for ChairMarker
 checks on Steam build `25553694`, Unreal Engine `5.5`. Follow your gameplay mod's
 version requirements. Other mods and game updates may need a different build.
 
-- [Original upstream ZIP](https://github.com/UE4SS-RE/RE-UE4SS/releases/download/experimental-latest/UE4SS_v3.0.1-1164-g5e627997.zip).
+- [Original upstream ZIP](https://github.com/UE4SS-RE/RE-UE4SS/releases/download/experimental/UE4SS_v3.0.1-1164-g5e627997.zip).
 - [Checked distribution builds](https://github.com/DooDesch-Mods/TheCabinGame-UE4SS/actions/workflows/ci.yml): open a successful run, download **ue4ss-package**, then extract the outer artifact ZIP.
 - [Distribution releases](https://github.com/DooDesch-Mods/TheCabinGame-UE4SS/releases). A Nexus loader page is being prepared.
 

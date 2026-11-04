@@ -44,6 +44,8 @@ jobs:
         run: python tools/distribution.py preflight
       - name: Check and prepare original upstream ZIP
         id: package
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: python tools/distribution.py prepare
       - name: Attach checked archive and receipt to GitHub release
         env:
