@@ -7,6 +7,11 @@ SHA-256, size and license hash. The builder downloads that asset and checks its
 bytes, archive paths, required loader files and preserved upstream license.
 The output ZIP is the original asset, not a repackaged loader.
 
+Upstream `experimental-latest` is a rolling release: every new build replaces its
+assets, so its download URLs break. Older builds stay in the `experimental` archive
+release, and the selected `url` points there. If the URL returns 404, `prepare`
+looks the asset up by name and SHA-256 in both releases and logs the URL it found.
+
 Use Python 3.13. `python tools/distribution.py prepare` creates the package and
 receipt under `dist`. Use `--source <original.zip>` to check a local copy.
 `python -m unittest discover -s tests` runs the offline guards.
@@ -16,7 +21,8 @@ receipt under `dist`. Use `--source <original.zip>` to check a local copy.
 The daily **Check upstream** workflow uses read-only permissions and also supports
 manual dispatch. It selects the newest basic ZIP from `experimental-latest`,
 checks the asset's reported SHA-256 and required archive files, and retains it as
-an unapproved workflow artifact. No candidate changes the tracked selection,
+an unapproved workflow artifact. The proposed `url` and `assetId` come from the
+`experimental` archive once the build is there. No candidate changes the tracked selection,
 creates a release or uploads to Nexus. If upstream omits a digest, the job fails
 instead of treating the asset as verified.
 

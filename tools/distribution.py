@@ -7,11 +7,16 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import sys
+import urllib.error
 import urllib.request
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 UPSTREAM = 'https://api.github.com/repos/UE4SS-RE/RE-UE4SS'
+# experimental-latest is a rolling release: each upstream build replaces its assets.
+# The experimental release keeps older builds, so pinned URLs point there.
+LATEST_TAG = 'experimental-latest'
+ARCHIVE_TAG = 'experimental'
 ASSET_PATTERN = re.compile(r'^UE4SS_(v\d+\.\d+\.\d+-\d+-g[0-9a-f]+)\.zip$')
 REQUIRED = {'dwmapi.dll', 'ue4ss/UE4SS.dll', 'ue4ss/LICENSE'}
 
@@ -23,6 +28,30 @@ def get(url, api=False):
         if response.status != 200:
             raise ValueError(f'download {url}: HTTP {response.status}')
         return response.read()
+
+def release_assets(tag):
+    return json.loads(get(f'{UPSTREAM}/releases/tags/{tag}', api=True))['assets']
+
+def find_asset(tag, name, digest):
+    for asset in release_assets(tag):
+        if asset['name'] == name and asset.get('digest') == digest:
+            return asset
+    return None
+
+def fetch_pinned(manifest):
+    try:
+        return get(manifest['url'])
+    except urllib.error.HTTPError as error:
+        if error.code != 404:
+            raise
+        print(f'warn: pinned URL returned 404, looking up {manifest["asset"]} in upstream releases: {manifest["url"]}', file=sys.stderr)
+    for tag in (ARCHIVE_TAG, LATEST_TAG):
+        asset = find_asset(tag, manifest['asset'], 'sha256:' + manifest['sha256'])
+        if asset:
+            print(f'warn: pinned asset found in upstream release {tag}, update distribution.json url to {asset["browser_download_url"]}', file=sys.stderr)
+            return get(asset['browser_download_url'])
+        print(f'info: upstream release {tag} has no asset {manifest["asset"]} with the pinned SHA-256', file=sys.stderr)
+    raise ValueError(f'pinned asset {manifest["asset"]} is no longer published upstream; select a new candidate')
 
 def validate(data, manifest, license_hash=None):
     digest = hashlib.sha256(data).hexdigest()
@@ -65,7 +94,7 @@ def prepare(manifest, source=None, target=None):
         raise ValueError('manifest asset name/version mismatch')
     if not re.fullmatch(r'[0-9a-f]{40}', manifest['sourceCommit']):
         raise ValueError('sourceCommit must be a full upstream commit')
-    data = source.read_bytes() if source else get(manifest['url'])
+    data = source.read_bytes() if source else fetch_pinned(manifest)
     digest = validate(data, manifest, manifest['licenseSha256'])
     target = target or ROOT / 'dist'
     target.mkdir(parents=True, exist_ok=True)
@@ -105,8 +134,7 @@ def latest_basic(assets):
     return max(candidates, key=lambda asset: (asset['created_at'], asset['id']))
 
 def candidate(manifest):
-    release = json.loads(get(UPSTREAM + '/releases/tags/experimental-latest', api=True))
-    asset = latest_basic(release['assets'])
+    asset = latest_basic(release_assets(LATEST_TAG))
     digest = asset.get('digest', '')
     if not re.fullmatch(r'sha256:[0-9a-f]{64}', digest or ''):
         raise ValueError(f'upstream basic asset {asset["name"]} has no usable SHA-256 digest')
@@ -114,6 +142,11 @@ def candidate(manifest):
         print('info: newest upstream basic package equals the selected version')
         output({'changed': False})
         return {'status': 'unchanged', 'asset': asset['name']}
+    archived = find_asset(ARCHIVE_TAG, asset['name'], digest)
+    if archived:
+        asset = archived
+    else:
+        print(f'warn: {asset["name"]} is not in upstream release {ARCHIVE_TAG} yet, the proposed url is on the rolling {LATEST_TAG} release', file=sys.stderr)
     proposal = {'asset': asset['name'], 'assetId': asset['id'], 'version': ASSET_PATTERN.fullmatch(asset['name'])[1],
                 'sha256': digest.removeprefix('sha256:'), 'bytes': asset['size'], 'url': asset['browser_download_url'],
                 'approvedForNexus': False, 'status': 'unapproved upstream candidate'}
