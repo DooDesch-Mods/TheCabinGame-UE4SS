@@ -2,6 +2,8 @@
 
 > 🛟 **Need help or found a bug?** Get support at [support.doodesch.de/ue4ss](https://support.doodesch.de/ue4ss).
 
+[![Discord](https://mods.doodesch.de/img/badge.svg)](https://mods.doodesch.de)
+
 [![Check distribution](https://github.com/DooDesch-Mods/TheCabinGame-UE4SS/actions/workflows/ci.yml/badge.svg)](https://github.com/DooDesch-Mods/TheCabinGame-UE4SS/actions/workflows/ci.yml)
 
 The original [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS) loader for the Steam
@@ -52,3 +54,9 @@ and its [MIT license](licenses/UE4SS-MIT.txt) remain unchanged. Our distribution
 tools and documents use the [DooDesch license](LICENSE.md), following
 ServerPasswordOnce. It does not cover UE4SS. See [credits](CREDITS.md) and the
 selected package in [distribution.json](distribution.json).
+
+## Community
+
+[![DooDesch Mods on Discord](https://mods.doodesch.de/img/card.svg)](https://mods.doodesch.de)
+
+Join the DooDesch Mods Discord: update pings, polls on what comes next, and playtests of new mods.
